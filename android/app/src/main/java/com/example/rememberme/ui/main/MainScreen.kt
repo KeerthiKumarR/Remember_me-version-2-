@@ -75,8 +75,6 @@ fun MainScreen(
 
     // Preferences and states
     val prefManager = remember { PreferencesManager(context) }
-    var currentChallenge by remember { mutableStateOf(Challenge.random()) }
-    var livenessStatus by remember { mutableStateOf(LivenessStatus.Waiting) }
     var statusText by remember { mutableStateOf("Looking for a familiar face...") }
     var recognition by remember { mutableStateOf<SummaryResponse?>(null) }
     
@@ -161,27 +159,6 @@ fun MainScreen(
 
     LaunchedEffect(Unit) {
         permissionLauncher.launch(Manifest.permission.CAMERA)
-    }
-
-    // Liveness challenge timers
-    LaunchedEffect(currentChallenge, livenessStatus) {
-        if (livenessStatus == LivenessStatus.Waiting) {
-            // Give 10 seconds to pass challenge
-            delay(10000)
-            if (livenessStatus == LivenessStatus.Waiting) {
-                livenessStatus = LivenessStatus.Failed
-            }
-        } else if (livenessStatus == LivenessStatus.Failed) {
-            delay(2000)
-            livenessStatus = LivenessStatus.Waiting
-            currentChallenge = Challenge.random()
-        } else if (livenessStatus == LivenessStatus.Passed) {
-            // Keep verified state for 30 seconds
-            delay(30000)
-            livenessStatus = LivenessStatus.Waiting
-            currentChallenge = Challenge.random()
-            recognition = null
-        }
     }
 
     val faceDetector = remember {
@@ -331,13 +308,10 @@ fun MainScreen(
                     cameraPermissionGranted = cameraPermissionGranted,
                     prefManager = prefManager,
                     faceDetector = faceDetector,
-                    currentChallenge = currentChallenge,
-                    livenessStatus = livenessStatus,
                     statusText = statusText,
                     recognition = recognition,
                     activeCaregiverName = activeCaregiverName,
                     activeCaregiverPhone = activeCaregiverPhone,
-                    onLivenessStatusChange = { livenessStatus = it },
                     onStatusTextChange = { statusText = it },
                     onRecognitionChange = { recognition = it },
                     onActiveCaregiverNameChange = { activeCaregiverName = it },
@@ -590,13 +564,10 @@ fun DashboardCamera(
     cameraPermissionGranted: Boolean,
     prefManager: PreferencesManager,
     faceDetector: com.google.mlkit.vision.face.FaceDetector,
-    currentChallenge: Challenge,
-    livenessStatus: LivenessStatus,
     statusText: String,
     recognition: SummaryResponse?,
     activeCaregiverName: String,
     activeCaregiverPhone: String,
-    onLivenessStatusChange: (LivenessStatus) -> Unit,
     onStatusTextChange: (String) -> Unit,
     onRecognitionChange: (SummaryResponse?) -> Unit,
     onActiveCaregiverNameChange: (String) -> Unit,
@@ -609,10 +580,7 @@ fun DashboardCamera(
     val coroutineScope = rememberCoroutineScope()
 
     // Wrap state arguments in rememberUpdatedState to avoid stale captures on background thread
-    val latestChallenge by rememberUpdatedState(currentChallenge)
-    val latestLivenessStatus by rememberUpdatedState(livenessStatus)
     val latestRecognition by rememberUpdatedState(recognition)
-    val latestOnLivenessStatusChange by rememberUpdatedState(onLivenessStatusChange)
     val latestOnStatusTextChange by rememberUpdatedState(onStatusTextChange)
     val latestOnRecognitionChange by rememberUpdatedState(onRecognitionChange)
     val latestOnActiveCaregiverNameChange by rememberUpdatedState(onActiveCaregiverNameChange)
@@ -636,7 +604,33 @@ fun DashboardCamera(
             .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(32.dp))
             .background(PanelColor)
     ) {
-        if (cameraPermissionGranted) {
+        var isCameraActive by remember { mutableStateOf(prefManager.cameraEnabled) }
+
+        DisposableEffect(isCameraActive) {
+            onDispose {
+                if (!isCameraActive) {
+                    try {
+                        val cameraProvider = ProcessCameraProvider.getInstance(context).get()
+                        cameraProvider.unbindAll()
+                    } catch (e: Exception) {
+                        Log.e("CameraSetup", "Error unbinding camera on pause", e)
+                    }
+                }
+            }
+        }
+
+        LaunchedEffect(isCameraActive) {
+            if (!isCameraActive) {
+                onStatusTextChange("Camera is inactive")
+                onRecognitionChange(null)
+                onActiveCaregiverNameChange("")
+                onActiveCaregiverPhoneChange("")
+            } else if (cameraPermissionGranted) {
+                onStatusTextChange("Looking for a familiar face...")
+            }
+        }
+
+        if (cameraPermissionGranted && isCameraActive) {
             AndroidView(
                 factory = { ctx ->
                     val previewView = PreviewView(ctx).apply {
@@ -664,123 +658,93 @@ fun DashboardCamera(
                                 )
                                 faceDetector.process(inputImage)
                                     .addOnSuccessListener { faces ->
-                                        val status = latestLivenessStatus
-                                        val challenge = latestChallenge
                                         if (faces.isNotEmpty()) {
                                             val face = faces[0]
                                             val smile = face.smilingProbability ?: 0f
                                             val yaw = face.headEulerAngleY
-                                            Log.d("LivenessCheck", "Face detected! Smile: $smile, Yaw: $yaw. Challenge: $challenge, Status: $status")
 
-                                            if (status == LivenessStatus.Waiting) {
-                                                when (challenge) {
-                                                    Challenge.SMILE -> {
-                                                        if (smile > 0.35f) {
-                                                            Log.d("LivenessCheck", "Smile challenge PASSED! smile=$smile")
-                                                            latestOnLivenessStatusChange(LivenessStatus.Passed)
+                                            val now = System.currentTimeMillis()
+                                            if (now - lastIdentifyTime > 3000 && !isIdentifyInFlight) {
+                                                lastIdentifyTime = now
+                                                isIdentifyInFlight = true
+
+                                                try {
+                                                    @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
+                                                    val rawBitmap = imageProxy.toBitmap()
+                                                    val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+                                                    val rotatedBitmap = if (rotationDegrees != 0) {
+                                                        val matrix = android.graphics.Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+                                                        val rb = Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
+                                                        if (rb != rawBitmap) {
+                                                            rawBitmap.recycle()
                                                         }
+                                                        rb
+                                                    } else {
+                                                        rawBitmap
                                                     }
-                                                    Challenge.TURN_LEFT -> {
-                                                        if (yaw > 10f) {
-                                                            Log.d("LivenessCheck", "Turn Left challenge PASSED! yaw=$yaw")
-                                                            latestOnLivenessStatusChange(LivenessStatus.Passed)
-                                                        }
+
+                                                    val bitmap = resizeBitmap(rotatedBitmap, 640)
+                                                    val stream = ByteArrayOutputStream()
+                                                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+
+                                                    if (bitmap != rotatedBitmap) {
+                                                        bitmap.recycle()
                                                     }
-                                                    Challenge.TURN_RIGHT -> {
-                                                        if (yaw < -10f) {
-                                                            Log.d("LivenessCheck", "Turn Right challenge PASSED! yaw=$yaw")
-                                                            latestOnLivenessStatusChange(LivenessStatus.Passed)
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                                    rotatedBitmap.recycle()
 
-                                            if (status == LivenessStatus.Passed) {
-                                                val now = System.currentTimeMillis()
-                                                if (now - lastIdentifyTime > 3000 && !isIdentifyInFlight) {
-                                                    lastIdentifyTime = now
-                                                    isIdentifyInFlight = true
+                                                    val base64 = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+                                                    val imagePayload = "data:image/jpeg;base64,$base64"
 
-                                                    try {
-                                                        @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
-                                                        val rawBitmap = imageProxy.toBitmap()
-                                                        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-                                                        val rotatedBitmap = if (rotationDegrees != 0) {
-                                                            val matrix = android.graphics.Matrix().apply { postRotate(rotationDegrees.toFloat()) }
-                                                            val rb = Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
-                                                            if (rb != rawBitmap) {
-                                                                rawBitmap.recycle()
-                                                            }
-                                                            rb
-                                                        } else {
-                                                            rawBitmap
-                                                        }
-
-                                                        val bitmap = resizeBitmap(rotatedBitmap, 640)
-                                                        val stream = ByteArrayOutputStream()
-                                                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-
-                                                        if (bitmap != rotatedBitmap) {
-                                                            bitmap.recycle()
-                                                        }
-                                                        rotatedBitmap.recycle()
-
-                                                        val base64 = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-                                                        val imagePayload = "data:image/jpeg;base64,$base64"
-
-                                                        coroutineScope.launch {
-                                                            try {
-                                                                latestOnStatusTextChange("Checking this face...")
-                                                                Log.d("IdentifyAPI", "Sending base64 image to server...")
-                                                                val api = NetworkClient.createService(prefManager.apiUrl)
-                                                                val response = api.identifyFace(ImagePayload(imagePayload))
-                                                                val match = response.match
-                                                                Log.d("IdentifyAPI", "Result: match=${match?.name}, confidence=${response.confidence}")
-                                                                if (match != null) {
-                                                                    latestOnStatusTextChange("Familiar face recognized")
-                                                                    latestOnActiveCaregiverNameChange(match.name)
-                                                                    latestOnActiveCaregiverPhoneChange(match.caregiver_phone ?: "")
-                                                                    if (cachedPersonId != match.person_id) {
-                                                                        val summary = api.summarizePerson(SummarizeRequest(match.person_id))
-                                                                        latestOnRecognitionChange(summary)
-                                                                        cachedPersonId = match.person_id
-                                                                    } else {
-                                                                        latestOnRecognitionChange(
-                                                                            latestRecognition?.copy(
-                                                                                name = match.name,
-                                                                                relationship = match.relationship
-                                                                            )
-                                                                        )
-                                                                    }
+                                                    coroutineScope.launch {
+                                                        try {
+                                                            latestOnStatusTextChange("Checking this face...")
+                                                            Log.d("IdentifyAPI", "Sending base64 image to server...")
+                                                            val api = NetworkClient.createService(prefManager.apiUrl)
+                                                            val response = api.identifyFace(ImagePayload(imagePayload))
+                                                            val match = response.match
+                                                            Log.d("IdentifyAPI", "Result: match=${match?.name}, confidence=${response.confidence}")
+                                                            if (match != null) {
+                                                                latestOnStatusTextChange("Familiar face recognized")
+                                                                latestOnActiveCaregiverNameChange(match.name)
+                                                                latestOnActiveCaregiverPhoneChange(match.caregiver_phone ?: "")
+                                                                if (cachedPersonId != match.person_id) {
+                                                                    val summary = api.summarizePerson(SummarizeRequest(match.person_id))
+                                                                    latestOnRecognitionChange(summary)
+                                                                    cachedPersonId = match.person_id
                                                                 } else {
-                                                                    latestOnRecognitionChange(null)
-                                                                    latestOnStatusTextChange("Looking for a familiar face...")
-                                                                    latestOnActiveCaregiverNameChange("")
-                                                                    latestOnActiveCaregiverPhoneChange("")
+                                                                    latestOnRecognitionChange(
+                                                                        latestRecognition?.copy(
+                                                                            name = match.name,
+                                                                            relationship = match.relationship
+                                                                        )
+                                                                    )
                                                                 }
-                                                            } catch (e: Exception) {
-                                                                Log.e("IdentifyAPI", "Error calling identify API", e)
+                                                            } else {
                                                                 latestOnRecognitionChange(null)
-                                                                latestOnStatusTextChange(e.message ?: "Connection failed")
+                                                                latestOnStatusTextChange("Looking for a familiar face...")
                                                                 latestOnActiveCaregiverNameChange("")
                                                                 latestOnActiveCaregiverPhoneChange("")
-                                                            } finally {
-                                                                isIdentifyInFlight = false
                                                             }
+                                                        } catch (e: Exception) {
+                                                            Log.e("IdentifyAPI", "Error calling identify API", e)
+                                                            latestOnRecognitionChange(null)
+                                                            latestOnStatusTextChange(e.message ?: "Connection failed")
+                                                            latestOnActiveCaregiverNameChange("")
+                                                            latestOnActiveCaregiverPhoneChange("")
+                                                        } finally {
+                                                            isIdentifyInFlight = false
                                                         }
-                                                    } catch (e: Exception) {
-                                                        Log.e("ImageConversion", "Failed converting frame to bitmap", e)
-                                                        isIdentifyInFlight = false
                                                     }
+                                                } catch (e: Exception) {
+                                                    Log.e("ImageConversion", "Failed converting frame to bitmap", e)
+                                                    isIdentifyInFlight = false
                                                 }
                                             }
                                         } else {
-                                            if (status == LivenessStatus.Waiting) {
-                                                latestOnStatusTextChange("Looking for a familiar face...")
-                                                latestOnRecognitionChange(null)
-                                                latestOnActiveCaregiverNameChange("")
-                                                latestOnActiveCaregiverPhoneChange("")
-                                            }
+                                            latestOnStatusTextChange("Looking for a familiar face...")
+                                            latestOnRecognitionChange(null)
+                                            latestOnActiveCaregiverNameChange("")
+                                            latestOnActiveCaregiverPhoneChange("")
                                         }
                                     }
                                     .addOnCompleteListener {
@@ -795,7 +759,7 @@ fun DashboardCamera(
                             cameraProvider.unbindAll()
                             cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
-                                CameraSelector.DEFAULT_FRONT_CAMERA,
+                                CameraSelector.DEFAULT_BACK_CAMERA,
                                 preview,
                                 imageAnalysis
                             )
@@ -807,6 +771,106 @@ fun DashboardCamera(
                 },
                 modifier = Modifier.fillMaxSize()
             )
+
+            // Top Right Stop Camera Button
+            Box(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .align(Alignment.TopEnd)
+            ) {
+                Button(
+                    onClick = {
+                        isCameraActive = false
+                        prefManager.cameraEnabled = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Black.copy(alpha = 0.45f),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier.height(38.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFEF4444))
+                        )
+                        Text(
+                            text = "Stop Camera",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        } else if (cameraPermissionGranted && !isCameraActive) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0F172A))
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(32.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.03f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                    ) {
+                        Text(
+                            text = "📷",
+                            fontSize = 32.sp
+                        )
+                    }
+
+                    Text(
+                        text = "Camera is stopped",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Turn on the camera to start recognizing faces.",
+                        color = Color.Gray,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Button(
+                        onClick = {
+                            isCameraActive = true
+                            prefManager.cameraEnabled = true
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MintColor,
+                            contentColor = InkColor
+                        ),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) {
+                        Text(
+                            text = "Start Camera",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
         } else {
             Box(
                 contentAlignment = Alignment.Center,
@@ -854,7 +918,7 @@ fun DashboardCamera(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(MintColor)
+                        .background(if (isCameraActive) MintColor else Color.Gray)
                 )
                 Text(
                     text = statusText,
@@ -864,41 +928,6 @@ fun DashboardCamera(
             }
         }
 
-        // Top Right Liveness Pill
-        val (livenessBg, livenessText, livenessTint) = when (livenessStatus) {
-            LivenessStatus.Passed -> Triple(
-                Color(0x334CAF50),
-                "✓ Live verified",
-                Color(0xFF81C784)
-            )
-            LivenessStatus.Failed -> Triple(
-                Color(0x33F44336),
-                "✗ No live face detected",
-                Color(0xFFE57373)
-            )
-            LivenessStatus.Waiting -> Triple(
-                Color(0x33FFC107),
-                "👁 " + currentChallenge.name.replace("_", " "),
-                Color(0xFFFFD54F)
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .padding(16.dp)
-                .align(Alignment.TopEnd)
-                .clip(RoundedCornerShape(20.dp))
-                .background(livenessBg)
-                .border(1.dp, livenessTint.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-        ) {
-            Text(
-                text = livenessText,
-                color = livenessTint,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
 
         // Bottom Overlay card for Recognition Results (Now resolves to top-level AnimatedVisibility perfectly!)
         AnimatedVisibility(

@@ -30,4 +30,17 @@ class PreferencesManager(context: Context) {
         set(value) {
             prefs.edit().putString(KEY_CAREGIVER_PHONE, value).apply()
         }
+
+    var remindersEnabled: Boolean
+        get() = prefs.getBoolean("reminders_enabled", true)
+        set(value) { prefs.edit().putBoolean("reminders_enabled", value).apply() }
+
+    var reminderIntervalMinutes: Int
+        get() = prefs.getInt("reminder_interval_minutes", 90)
+        set(value) { prefs.edit().putInt("reminder_interval_minutes", value).apply() }
+
+    var cameraEnabled: Boolean
+        get() = prefs.getBoolean("camera_enabled", true)
+        set(value) { prefs.edit().putBoolean("camera_enabled", value).apply() }
+
 }

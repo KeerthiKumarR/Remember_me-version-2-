@@ -197,7 +197,12 @@ async def enroll(payload: EnrollRequest, request: Request) -> dict[str, Any]:
 
 @app.post("/identify")
 async def identify(payload: ImagePayload, request: Request) -> dict[str, Any]:
-    probe_embedding = request.app.state.face_encoder.create_embedding(payload.image)
+    try:
+        probe_embedding = request.app.state.face_encoder.create_embedding(payload.image)
+    except HTTPException as exc:
+        if exc.status_code in (status.HTTP_422_UNPROCESSABLE_ENTITY, status.HTTP_400_BAD_REQUEST):
+            return {"match": None, "confidence": 0.0}
+        raise exc
     best_person: dict[str, Any] | None = None
     best_similarity = -1.0
     try:

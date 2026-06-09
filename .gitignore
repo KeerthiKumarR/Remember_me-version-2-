@@ -1,0 +1,110 @@
+# =============================================================
+# RememberMe — Monorepo .gitignore
+# Covers: Python/FastAPI backend, Next.js frontend, Android app
+# =============================================================
+
+# =============================================================
+# SECURITY — never commit secrets
+# =============================================================
+backend/.env
+frontend/.env.local
+*.env
+!*.env.example
+!*.env.local.example
+
+# =============================================================
+# ZIP / ARCHIVES — prevent committing project zips
+# =============================================================
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# =============================================================
+# BACKEND — Python / FastAPI
+# =============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.venv/
+venv/
+env/
+.Python
+pip-log.txt
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Large ONNX face models — auto-downloaded on first startup
+backend/models/*.onnx
+backend/models/*.caffemodel
+backend/models/*.pb
+!backend/models/README.md
+
+# =============================================================
+# FRONTEND — Next.js / Node
+# =============================================================
+node_modules/
+.next/
+out/
+build/
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+
+# =============================================================
+# ANDROID — Kotlin / Gradle
+# =============================================================
+.gradle/
+local.properties
+android/build/
+android/app/build/
+android/captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.keystore
+*.jks
+!debug.keystore
+*.iml
+.idea/
+*.hprof
+
+# =============================================================
+# OS FILES
+# =============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# =============================================================
+# EDITORS
+# =============================================================
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
