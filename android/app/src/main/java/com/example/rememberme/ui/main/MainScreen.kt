@@ -75,6 +75,7 @@ val BorderColor = Color(0xFF2E333F)
 @Composable
 fun MainScreen(
     onNavigateToEnroll: () -> Unit,
+    isActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -218,7 +219,10 @@ fun MainScreen(
                         )
                     }
                     Button(
-                        onClick = onNavigateToEnroll,
+                        onClick = {
+                            prefManager.cameraEnabled = true
+                            onNavigateToEnroll()
+                        },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Transparent
                         ),
@@ -326,6 +330,7 @@ fun MainScreen(
                     onActiveCaregiverNameChange = { activeCaregiverName = it },
                     onActiveCaregiverPhoneChange = { activeCaregiverPhone = it },
                     onShowMemoryModal = { showMemoryModal = true },
+                    isActive = isActive,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -681,6 +686,7 @@ fun DashboardCamera(
     onActiveCaregiverNameChange: (String) -> Unit,
     onActiveCaregiverPhoneChange: (String) -> Unit,
     onShowMemoryModal: () -> Unit,
+    isActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -712,11 +718,13 @@ fun DashboardCamera(
             .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(32.dp))
             .background(PanelColor)
     ) {
-        var isCameraActive by remember { mutableStateOf(prefManager.cameraEnabled) }
+        var isCameraActive by remember(prefManager.cameraEnabled, isActive) {
+            mutableStateOf(prefManager.cameraEnabled && isActive)
+        }
 
         DisposableEffect(isCameraActive) {
             onDispose {
-                if (!isCameraActive) {
+                if (!prefManager.cameraEnabled) {
                     try {
                         val cameraProvider = ProcessCameraProvider.getInstance(context).get()
                         cameraProvider.unbindAll()

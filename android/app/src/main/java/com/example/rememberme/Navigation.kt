@@ -21,6 +21,7 @@ fun MainNavigation() {
         entry<Main> {
           MainScreen(
             onNavigateToEnroll = { backStack.add(Enroll) },
+            isActive = backStack.lastOrNull() == Main,
             modifier = Modifier.safeDrawingPadding()
           )
         }
