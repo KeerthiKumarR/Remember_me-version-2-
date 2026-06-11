@@ -8,6 +8,10 @@ import android.util.Log
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Priority
+import android.os.PowerManager
+import android.provider.Settings
+import android.net.Uri
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -20,6 +24,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -48,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
+import android.os.Build
+import com.example.rememberme.notification.ReminderScheduler
 import com.example.rememberme.data.*
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
@@ -83,6 +90,7 @@ fun MainScreen(
     var apiInputUrl by remember { mutableStateOf(prefManager.apiUrl) }
     var caregiverInputName by remember { mutableStateOf(prefManager.caregiverName) }
     var caregiverInputPhone by remember { mutableStateOf(prefManager.caregiverPhone) }
+    var remindersInputEnabled by remember { mutableStateOf(prefManager.remindersEnabled) }
 
     // Memory modal
     var showMemoryModal by remember { mutableStateOf(false) }
@@ -200,6 +208,7 @@ fun MainScreen(
                         apiInputUrl = prefManager.apiUrl
                         caregiverInputName = prefManager.caregiverName
                         caregiverInputPhone = prefManager.caregiverPhone
+                        remindersInputEnabled = prefManager.remindersEnabled
                         showApiSettings = true
                     }) {
                         Icon(
@@ -405,7 +414,8 @@ fun MainScreen(
                                             memoryNote = ""
                                             isMemorySaved = false
                                         } catch (e: Exception) {
-                                            e.printStackTrace()
+                                            Log.e("SaveMemory", "Failed to save memory", e)
+                                            android.widget.Toast.makeText(context, "Failed to save memory. Please check your network connection.", android.widget.Toast.LENGTH_LONG).show()
                                         } finally {
                                             isSavingMemory = false
                                         }
@@ -456,39 +466,45 @@ fun MainScreen(
                 Column(
                     modifier = Modifier.padding(24.dp)
                 ) {
+                    var titleClickCount by remember { mutableStateOf(0) }
+
                     Text(
                         text = "Server Configuration",
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        modifier = Modifier
+                            .padding(bottom = 6.dp)
+                            .clickable { titleClickCount++ }
                     )
                     Text(
-                        text = "Configure the backend API URL. Defaults to http://10.0.2.2:8000 for local emulator testing.",
+                        text = "Configure caregiver details used for SOS alerts.",
                         color = Color.Gray,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
-                    // URL text input
-                    OutlinedTextField(
-                        value = apiInputUrl,
-                        onValueChange = { apiInputUrl = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                        label = { Text("API Base URL") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MintColor,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                            focusedLabelColor = MintColor,
-                            unfocusedLabelColor = Color.Gray
-                        ),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    // URL text input (Developer Mode)
+                    if (titleClickCount >= 5) {
+                        OutlinedTextField(
+                            value = apiInputUrl,
+                            onValueChange = { apiInputUrl = it },
+                            textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                            label = { Text("API Base URL (Developer Mode)") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MintColor,
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                                focusedLabelColor = MintColor,
+                                unfocusedLabelColor = Color.Gray
+                            ),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
 
                     // Caregiver Name input
                     OutlinedTextField(
@@ -524,7 +540,93 @@ fun MainScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    // Dementia Reminders Row
                     Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Dementia Reminders",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Enable periodic voice and push notifications.",
+                                color = Color.Gray,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = remindersInputEnabled,
+                            onCheckedChange = { remindersInputEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MintColor,
+                                checkedTrackColor = MintColor.copy(alpha = 0.4f),
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
+                            )
+                        )
+                    }
+
+                    // Battery Optimization Row
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
+                        val isIgnoring = remember {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                            } else {
+                                true
+                            }
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Battery Optimization",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isIgnoring) "Status: Unrestricted (Good)" else "Status: Optimized (May delay reminders)",
+                                color = if (isIgnoring) MintColor else Color.Gray,
+                                fontSize = 11.sp
+                            )
+                        }
+                        if (!isIgnoring) {
+                            Button(
+                                onClick = {
+                                    try {
+                                        val intent = Intent().apply {
+                                            action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Log.e("Settings", "Failed battery request", e)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MintColor),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text("Disable", color = InkColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Text("✓", color = MintColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -535,6 +637,12 @@ fun MainScreen(
                                 prefManager.apiUrl = apiInputUrl.trim()
                                 prefManager.caregiverName = caregiverInputName.trim()
                                 prefManager.caregiverPhone = caregiverInputPhone.trim()
+                                prefManager.remindersEnabled = remindersInputEnabled
+                                if (remindersInputEnabled) {
+                                    ReminderScheduler.schedule(context)
+                                } else {
+                                    ReminderScheduler.cancel(context)
+                                }
                                 showApiSettings = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MintColor),
@@ -728,7 +836,17 @@ fun DashboardCamera(
                                                         } catch (e: Exception) {
                                                             Log.e("IdentifyAPI", "Error calling identify API", e)
                                                             latestOnRecognitionChange(null)
-                                                            latestOnStatusTextChange(e.message ?: "Connection failed")
+                                                            val isNetwork = e is java.io.IOException || 
+                                                                            e is java.net.UnknownHostException || 
+                                                                            e is java.net.ConnectException || 
+                                                                            e is java.net.SocketTimeoutException || 
+                                                                            (e.message?.contains("Unable to resolve host", ignoreCase = true) == true) || 
+                                                                            (e.message?.contains("Failed to connect", ignoreCase = true) == true)
+                                                            if (isNetwork) {
+                                                                latestOnStatusTextChange("Unable to connect to server")
+                                                            } else {
+                                                                latestOnStatusTextChange("Connection failed")
+                                                            }
                                                             latestOnActiveCaregiverNameChange("")
                                                             latestOnActiveCaregiverPhoneChange("")
                                                         } finally {
@@ -1133,7 +1251,14 @@ private fun sendSosLocationUpdate(
                 onStatusChange("Emergency SOS Alert Sent")
             } catch (e: Exception) {
                 Log.e("SOS_API", "Failed to send SOS", e)
-                android.widget.Toast.makeText(context, "SOS API error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                val isNetwork = e is java.io.IOException || 
+                                e is java.net.UnknownHostException || 
+                                e is java.net.ConnectException || 
+                                e is java.net.SocketTimeoutException || 
+                                (e.message?.contains("Unable to resolve host", ignoreCase = true) == true) || 
+                                (e.message?.contains("Failed to connect", ignoreCase = true) == true)
+                val userMsg = if (isNetwork) "Unable to connect to the server. Please check your network connection." else "SOS alert failed. Please try again."
+                android.widget.Toast.makeText(context, userMsg, android.widget.Toast.LENGTH_LONG).show()
                 onStatusChange("SOS send failed")
             }
         }

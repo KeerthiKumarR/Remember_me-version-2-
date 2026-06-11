@@ -48,7 +48,7 @@ object ReminderScheduler {
 
     fun getIntervalMinutes(context: Context): Int =
         context.getSharedPreferences("rememberme_prefs", Context.MODE_PRIVATE)
-            .getInt("reminder_interval_minutes", 90)
+            .getInt("reminder_interval_minutes", 2)
 
     fun setIntervalMinutes(context: Context, minutes: Int) {
         context.getSharedPreferences("rememberme_prefs", Context.MODE_PRIVATE)

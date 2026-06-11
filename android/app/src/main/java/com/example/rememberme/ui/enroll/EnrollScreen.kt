@@ -391,7 +391,17 @@ fun EnrollScreen(
                                         capturedBase64 = ""
                                     } catch (e: Exception) {
                                         Log.e("EnrollSubmit", "Enrollment request failed", e)
-                                        message = e.localizedMessage ?: "Enrollment failed."
+                                        val isNetwork = e is java.io.IOException || 
+                                                        e is java.net.UnknownHostException || 
+                                                        e is java.net.ConnectException || 
+                                                        e is java.net.SocketTimeoutException || 
+                                                        (e.message?.contains("Unable to resolve host", ignoreCase = true) == true) || 
+                                                        (e.message?.contains("Failed to connect", ignoreCase = true) == true)
+                                        message = if (isNetwork) {
+                                            "Unable to connect to the server. Please check your network connection."
+                                        } else {
+                                            "Enrollment failed. Please try again."
+                                        }
                                     } finally {
                                         isSubmitting = false
                                     }

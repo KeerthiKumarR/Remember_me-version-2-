@@ -14,7 +14,15 @@ class PreferencesManager(context: Context) {
     }
 
     var apiUrl: String
-        get() = prefs.getString(KEY_API_URL, DEFAULT_API_URL) ?: DEFAULT_API_URL
+        get() {
+            val current = prefs.getString(KEY_API_URL, DEFAULT_API_URL) ?: DEFAULT_API_URL
+            return if (current.contains("10.201.") || current.contains("127.0.0.1") || current.contains("localhost")) {
+                prefs.edit().putString(KEY_API_URL, DEFAULT_API_URL).apply()
+                DEFAULT_API_URL
+            } else {
+                current
+            }
+        }
         set(value) {
             prefs.edit().putString(KEY_API_URL, value).apply()
         }
@@ -36,7 +44,7 @@ class PreferencesManager(context: Context) {
         set(value) { prefs.edit().putBoolean("reminders_enabled", value).apply() }
 
     var reminderIntervalMinutes: Int
-        get() = prefs.getInt("reminder_interval_minutes", 90)
+        get() = prefs.getInt("reminder_interval_minutes", 2)
         set(value) { prefs.edit().putInt("reminder_interval_minutes", value).apply() }
 
     var cameraEnabled: Boolean
