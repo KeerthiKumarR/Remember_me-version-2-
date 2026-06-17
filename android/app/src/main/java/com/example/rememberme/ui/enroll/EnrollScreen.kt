@@ -11,6 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -40,9 +42,8 @@ import androidx.core.content.ContextCompat
 import com.example.rememberme.data.EnrollRequest
 import com.example.rememberme.data.NetworkClient
 import com.example.rememberme.data.PreferencesManager
-import com.example.rememberme.ui.main.InkColor
-import com.example.rememberme.ui.main.MintColor
-import com.example.rememberme.ui.main.PanelColor
+import com.example.rememberme.theme.LocalAppColors
+import androidx.compose.foundation.shape.CircleShape
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
@@ -57,6 +58,7 @@ fun EnrollScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     val prefManager = remember { PreferencesManager(context) }
+    val colors = LocalAppColors.current
 
     // State variables
     var name by remember { mutableStateOf("") }
@@ -66,6 +68,8 @@ fun EnrollScreen(
     var capturedBase64 by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("Use a well-lit, front-facing photo with only one person visible.") }
     var isSubmitting by remember { mutableStateOf(false) }
+    var isFrontCamera by remember { mutableStateOf(false) }
+    var capturedWithFrontCamera by remember { mutableStateOf(false) }
 
     // Camera capture tools
     val imageCapture = remember { ImageCapture.Builder().build() }
@@ -83,12 +87,12 @@ fun EnrollScreen(
     Scaffold(
         modifier = modifier
             .fillMaxSize()
-            .background(InkColor),
+            .background(colors.ink),
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = InkColor,
-                    titleContentColor = Color.White
+                    containerColor = colors.ink,
+                    titleContentColor = colors.topBarTitle
                 ),
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -96,13 +100,13 @@ fun EnrollScreen(
                             text = "Add Familiar Face",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
-                            color = Color.White
+                            color = colors.topBarTitle
                         )
                     }
                 },
                 navigationIcon = {
                     TextButton(onClick = onBack) {
-                        Text(text = "← Back", color = Color.LightGray, fontSize = 14.sp)
+                        Text(text = "← Back", color = colors.topBarNavigationText, fontSize = 14.sp)
                     }
                 }
             )
@@ -112,7 +116,7 @@ fun EnrollScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(InkColor)
+                .background(colors.ink)
                 .padding(16.dp)
         ) {
             Column(
@@ -123,7 +127,7 @@ fun EnrollScreen(
                 // Header Titles
                 Text(
                     text = "NEW PERSON",
-                    color = MintColor,
+                    color = colors.mint,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 2.sp,
@@ -131,7 +135,7 @@ fun EnrollScreen(
                 )
                 Text(
                     text = "Add a familiar face",
-                    color = Color.White,
+                    color = colors.textPrimary,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -143,42 +147,48 @@ fun EnrollScreen(
                         .fillMaxWidth()
                         .height(320.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(24.dp))
-                        .background(PanelColor)
+                        .border(1.dp, colors.cardBorder, RoundedCornerShape(24.dp))
+                        .background(colors.panel)
                 ) {
                     if (capturedBitmap != null) {
                         Image(
                             bitmap = capturedBitmap!!.asImageBitmap(),
                             contentDescription = "Captured Enrollment Snapshot",
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = -1f)
+                            modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = if (capturedWithFrontCamera) -1f else 1f)
                         )
                     } else if (cameraPermissionGranted) {
                         AndroidView(
                             factory = { ctx ->
-                                val previewView = PreviewView(ctx).apply {
+                                PreviewView(ctx).apply {
                                     scaleType = PreviewView.ScaleType.FILL_CENTER
                                 }
-                                val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+                            },
+                            update = { previewView ->
+                                val localIsFrontCamera = isFrontCamera
+                                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                                 cameraProviderFuture.addListener({
                                     val cameraProvider = cameraProviderFuture.get()
                                     val preview = Preview.Builder().build().also {
                                         it.setSurfaceProvider(previewView.surfaceProvider)
                                     }
-
+                                    val cameraSelector = if (localIsFrontCamera) {
+                                        CameraSelector.DEFAULT_FRONT_CAMERA
+                                    } else {
+                                        CameraSelector.DEFAULT_BACK_CAMERA
+                                    }
                                     try {
                                         cameraProvider.unbindAll()
                                         cameraProvider.bindToLifecycle(
                                             lifecycleOwner,
-                                            CameraSelector.DEFAULT_FRONT_CAMERA,
+                                            cameraSelector,
                                             preview,
                                             imageCapture
                                         )
                                     } catch (e: Exception) {
                                         Log.e("EnrollCamera", "Failed use case binding", e)
                                     }
-                                }, ContextCompat.getMainExecutor(ctx))
-                                previewView
+                                }, ContextCompat.getMainExecutor(context))
                             },
                             modifier = Modifier.fillMaxSize()
                         )
@@ -209,7 +219,7 @@ fun EnrollScreen(
                                     capturedBase64 = ""
                                     message = "Photo cleared. Take a new photo."
                                 } else {
-                                    // Capture
+                                    capturedWithFrontCamera = isFrontCamera
                                     val executor = Executors.newSingleThreadExecutor()
                                     imageCapture.takePicture(
                                         executor,
@@ -242,15 +252,32 @@ fun EnrollScreen(
                                     )
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.textPrimary),
                             shape = RoundedCornerShape(24.dp),
                             modifier = Modifier.height(48.dp)
                         ) {
                             Text(
                                 text = if (capturedBitmap != null) "Retake photo" else "Capture photo",
-                                color = InkColor,
+                                color = colors.panel,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
+                            )
+                        }
+                    }
+
+                    // Switch Camera overlay at top right of the camera box
+                    if (capturedBitmap == null && cameraPermissionGranted) {
+                        IconButton(
+                            onClick = { isFrontCamera = !isFrontCamera },
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .align(Alignment.TopEnd)
+                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Cameraswitch,
+                                contentDescription = "Switch Camera",
+                                tint = Color.White
                             )
                         }
                     }
@@ -261,8 +288,8 @@ fun EnrollScreen(
                 // Registration Form Card
                 Card(
                     shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
-                    colors = CardDefaults.cardColors(containerColor = PanelColor.copy(alpha = 0.7f)),
+                    border = BorderStroke(1.dp, colors.cardBorder),
+                    colors = CardDefaults.cardColors(containerColor = colors.cardContainer),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -271,7 +298,7 @@ fun EnrollScreen(
                         // Name Input
                         Text(
                             text = "Name",
-                            color = Color.LightGray,
+                            color = colors.textSecondary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(bottom = 6.dp)
@@ -279,14 +306,14 @@ fun EnrollScreen(
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
-                            placeholder = { Text("Jake", color = Color.Gray) },
+                            textStyle = TextStyle(color = colors.textPrimary, fontSize = 14.sp),
+                            placeholder = { Text("Jake", color = colors.textTertiary) },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MintColor,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.10f),
-                                focusedContainerColor = Color.Black.copy(alpha = 0.25f),
-                                unfocusedContainerColor = Color.Black.copy(alpha = 0.25f)
+                                focusedBorderColor = colors.mint,
+                                unfocusedBorderColor = colors.cardBorder,
+                                focusedContainerColor = colors.inputBackground,
+                                unfocusedContainerColor = colors.inputBackground
                             ),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -297,7 +324,7 @@ fun EnrollScreen(
                         // Relationship Input
                         Text(
                             text = "Relationship",
-                            color = Color.LightGray,
+                            color = colors.textSecondary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(bottom = 6.dp)
@@ -305,14 +332,14 @@ fun EnrollScreen(
                         OutlinedTextField(
                             value = relationship,
                             onValueChange = { relationship = it },
-                            textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
-                            placeholder = { Text("Son", color = Color.Gray) },
+                            textStyle = TextStyle(color = colors.textPrimary, fontSize = 14.sp),
+                            placeholder = { Text("Son", color = colors.textTertiary) },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MintColor,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.10f),
-                                focusedContainerColor = Color.Black.copy(alpha = 0.25f),
-                                unfocusedContainerColor = Color.Black.copy(alpha = 0.25f)
+                                focusedBorderColor = colors.mint,
+                                unfocusedBorderColor = colors.cardBorder,
+                                focusedContainerColor = colors.inputBackground,
+                                unfocusedContainerColor = colors.inputBackground
                             ),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -323,7 +350,7 @@ fun EnrollScreen(
                         // Caregiver Phone Input
                         Text(
                             text = "Caregiver Phone",
-                            color = Color.LightGray,
+                            color = colors.textSecondary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(bottom = 6.dp)
@@ -331,14 +358,14 @@ fun EnrollScreen(
                         OutlinedTextField(
                             value = caregiverPhone,
                             onValueChange = { caregiverPhone = it },
-                            textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
-                            placeholder = { Text("9876543210", color = Color.Gray) },
+                            textStyle = TextStyle(color = colors.textPrimary, fontSize = 14.sp),
+                            placeholder = { Text("9876543210", color = colors.textTertiary) },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MintColor,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.10f),
-                                focusedContainerColor = Color.Black.copy(alpha = 0.25f),
-                                unfocusedContainerColor = Color.Black.copy(alpha = 0.25f)
+                                focusedBorderColor = colors.mint,
+                                unfocusedBorderColor = colors.cardBorder,
+                                focusedContainerColor = colors.inputBackground,
+                                unfocusedContainerColor = colors.inputBackground
                             ),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -349,7 +376,7 @@ fun EnrollScreen(
                         // Guideline / Status Message Text
                         Text(
                             text = message,
-                            color = Color.Gray,
+                            color = colors.textSecondary,
                             fontSize = 13.sp,
                             lineHeight = 18.sp,
                             modifier = Modifier.fillMaxWidth()
@@ -408,7 +435,7 @@ fun EnrollScreen(
                                 }
                             },
                             enabled = !isSubmitting && name.trim().isNotEmpty() && relationship.trim().isNotEmpty(),
-                            colors = ButtonDefaults.buttonColors(containerColor = MintColor),
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.mint),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -416,7 +443,7 @@ fun EnrollScreen(
                         ) {
                             Text(
                                 text = if (isSubmitting) "Adding person..." else "Add familiar face",
-                                color = InkColor,
+                                color = if (colors.isDark) colors.ink else Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp
                             )

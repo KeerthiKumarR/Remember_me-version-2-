@@ -51,4 +51,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("camera_enabled", true)
         set(value) { prefs.edit().putBoolean("camera_enabled", value).apply() }
 
+    var darkMode: Boolean
+        get() = prefs.getBoolean("dark_mode", true)
+        set(value) { prefs.edit().putBoolean("dark_mode", value).apply() }
 }

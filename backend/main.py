@@ -48,8 +48,13 @@ class EnrollRequest(ImagePayload):
     caregiver_phone: str | None = Field(None, max_length=20)
 
 class MemoryLogRequest(BaseModel):
-    person_id: str = Field(..., min_length=1)
-    note: str = Field(..., min_length=1, max_length=2000)
+    person_id: str | None = Field(None)
+    note: str | None = Field(None, max_length=2000)
+    person_name: str | None = Field(None, max_length=100)
+    relationship: str | None = Field(None, max_length=100)
+    summary: str | None = Field(None, max_length=2000)
+    caregiver_phone: str | None = Field(None, max_length=20)
+    timestamp: str | None = Field(None)
 
 class SummarizeRequest(BaseModel):
     person_id: str = Field(..., min_length=1)
@@ -239,13 +244,62 @@ async def get_memories(person_id: str, request: Request) -> dict[str, Any]:
 
 @app.post("/memory/log", status_code=status.HTTP_201_CREATED)
 async def log_memory(payload: MemoryLogRequest, request: Request) -> dict[str, Any]:
-    person = await request.app.state.db.people.find_one({"person_id": payload.person_id}, {"_id": 1})
-    if person is None:
-        raise HTTPException(status_code=404, detail="Person not found.")
-    memory = {"person_id": payload.person_id, "note": payload.note.strip(), "created_at": utc_now()}
-    result = await request.app.state.db.memories.insert_one(memory)
-    memory["_id"] = result.inserted_id
-    return serialize_memory(memory)
+    if payload.person_name:
+        person = await request.app.state.db.people.find_one({
+            "name": payload.person_name.strip(),
+            "caregiver_phone": payload.caregiver_phone.strip() if payload.caregiver_phone else None
+        })
+        if not person:
+            person = await request.app.state.db.people.find_one({
+                "name": payload.person_name.strip()
+            })
+        
+        if person:
+            person_id = person["person_id"]
+        else:
+            person_id = os.urandom(12).hex()
+            new_person = {
+                "person_id": person_id,
+                "name": payload.person_name.strip(),
+                "relationship": payload.relationship.strip() if payload.relationship else "Visitor",
+                "caregiver_phone": payload.caregiver_phone.strip() if payload.caregiver_phone else None,
+                "embedding": [],
+                "embedding_model": FACE_EMBEDDING_MODEL,
+                "created_at": utc_now()
+            }
+            await request.app.state.db.people.insert_one(new_person)
+        
+        created_at = utc_now()
+        if payload.timestamp:
+            try:
+                ts_str = payload.timestamp.replace("Z", "+00:00")
+                created_at = datetime.fromisoformat(ts_str)
+            except Exception:
+                pass
+        
+        memory = {
+            "person_id": person_id,
+            "note": payload.summary.strip() if payload.summary else "",
+            "created_at": created_at
+        }
+        result = await request.app.state.db.memories.insert_one(memory)
+        memory["_id"] = result.inserted_id
+        return serialize_memory(memory)
+        
+    else:
+        if not payload.person_id:
+            raise HTTPException(status_code=400, detail="person_id is required.")
+        person = await request.app.state.db.people.find_one({"person_id": payload.person_id}, {"_id": 1})
+        if person is None:
+            raise HTTPException(status_code=404, detail="Person not found.")
+        memory = {
+            "person_id": payload.person_id,
+            "note": payload.note.strip() if payload.note else "",
+            "created_at": utc_now()
+        }
+        result = await request.app.state.db.memories.insert_one(memory)
+        memory["_id"] = result.inserted_id
+        return serialize_memory(memory)
 
 @app.post("/summarize")
 async def summarize(payload: SummarizeRequest, request: Request) -> dict[str, Any]:

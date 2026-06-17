@@ -12,9 +12,11 @@ data class EnrollRequest(
 )
 
 data class MemoryLogRequest(
+    val person_id: String,
     val person_name: String,
     val relationship: String,
     val summary: String,
+    val note: String,
     val caregiver_phone: String,
     val timestamp: String
 )

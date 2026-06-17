@@ -10,7 +10,10 @@ import com.example.rememberme.ui.main.MainScreen
 import com.example.rememberme.ui.enroll.EnrollScreen
 
 @Composable
-fun MainNavigation() {
+fun MainNavigation(
+    isDarkMode: Boolean,
+    onThemeChanged: (Boolean) -> Unit
+) {
   val backStack = rememberNavBackStack(Main)
 
   NavDisplay(
@@ -22,6 +25,7 @@ fun MainNavigation() {
           MainScreen(
             onNavigateToEnroll = { backStack.add(Enroll) },
             isActive = backStack.lastOrNull() == Main,
+            onThemeChanged = onThemeChanged,
             modifier = Modifier.safeDrawingPadding()
           )
         }

@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.rememberme.theme.LocalAppColors
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
@@ -76,6 +77,7 @@ val BorderColor = Color(0xFF2E333F)
 fun MainScreen(
     onNavigateToEnroll: () -> Unit,
     isActive: Boolean = true,
+    onThemeChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -83,6 +85,7 @@ fun MainScreen(
 
     // Preferences and states
     val prefManager = remember { PreferencesManager(context) }
+    val colors = LocalAppColors.current
     var statusText by remember { mutableStateOf("Looking for a familiar face...") }
     var recognition by remember { mutableStateOf<SummaryResponse?>(null) }
     
@@ -92,6 +95,7 @@ fun MainScreen(
     var caregiverInputName by remember { mutableStateOf(prefManager.caregiverName) }
     var caregiverInputPhone by remember { mutableStateOf(prefManager.caregiverPhone) }
     var remindersInputEnabled by remember { mutableStateOf(prefManager.remindersEnabled) }
+    var darkModeInputEnabled by remember { mutableStateOf(prefManager.darkMode) }
 
     // Memory modal
     var showMemoryModal by remember { mutableStateOf(false) }
@@ -181,12 +185,12 @@ fun MainScreen(
     Scaffold(
         modifier = modifier
             .fillMaxSize()
-            .background(InkColor),
+            .background(colors.ink),
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = InkColor,
-                    titleContentColor = Color.White
+                    containerColor = colors.ink,
+                    titleContentColor = colors.topBarTitle
                 ),
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -194,13 +198,13 @@ fun MainScreen(
                             text = "Remember",
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp,
-                            color = Color.White
+                            color = colors.topBarTitle
                         )
                         Text(
                             text = "Me",
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp,
-                            color = MintColor
+                            color = colors.mint
                         )
                     }
                 },
@@ -210,12 +214,13 @@ fun MainScreen(
                         caregiverInputName = prefManager.caregiverName
                         caregiverInputPhone = prefManager.caregiverPhone
                         remindersInputEnabled = prefManager.remindersEnabled
+                        darkModeInputEnabled = prefManager.darkMode
                         showApiSettings = true
                     }) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "API Settings",
-                            tint = Color.LightGray
+                            tint = colors.topBarNavigationText
                         )
                     }
                     Button(
@@ -228,11 +233,11 @@ fun MainScreen(
                         ),
                         modifier = Modifier
                             .padding(end = 8.dp)
-                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                            .border(1.dp, colors.cardBorder, RoundedCornerShape(20.dp))
                     ) {
                         Text(
                             text = "Add familiar face",
-                            color = Color.White,
+                            color = colors.textPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -293,7 +298,7 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(InkColor)
+                .background(colors.ink)
                 .padding(16.dp)
         ) {
             Column(
@@ -302,7 +307,7 @@ fun MainScreen(
                 // Header Titles
                 Text(
                     text = "YOUR MEMORY COMPANION",
-                    color = MintColor,
+                    color = colors.mint,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 2.sp,
@@ -310,7 +315,7 @@ fun MainScreen(
                 )
                 Text(
                     text = "See someone you know.",
-                    color = Color.White,
+                    color = colors.textPrimary,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -349,8 +354,8 @@ fun MainScreen(
         }) {
             Card(
                 shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF090D16)),
+                border = BorderStroke(1.dp, colors.cardBorder),
+                colors = CardDefaults.cardColors(containerColor = colors.panel),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
@@ -360,14 +365,14 @@ fun MainScreen(
                 ) {
                     Text(
                         text = "Add a memory",
-                        color = Color.White,
+                        color = colors.textPrimary,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
                     Text(
                         text = "Write a note about ${rec.name} — it will make future summaries more personal.",
-                        color = Color.Gray,
+                        color = colors.textSecondary,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -379,22 +384,22 @@ fun MainScreen(
                             .fillMaxWidth()
                             .height(110.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Color.White.copy(alpha = 0.05f))
-                            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
+                            .background(colors.inputBackground)
+                            .border(1.dp, colors.cardBorder, RoundedCornerShape(16.dp))
                             .padding(12.dp)
                     ) {
                         if (memoryNote.isEmpty()) {
                             Text(
                                 text = "e.g. \"${rec.name} visited today, we watched the game and had tea.\"",
-                                color = Color.Gray,
+                                color = colors.textTertiary,
                                 fontSize = 13.sp
                             )
                         }
                         BasicTextField(
                             value = memoryNote,
                             onValueChange = { memoryNote = it },
-                            textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                            cursorBrush = SolidColor(MintColor),
+                            textStyle = TextStyle(color = colors.textPrimary, fontSize = 13.sp),
+                            cursorBrush = SolidColor(colors.mint),
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -428,13 +433,13 @@ fun MainScreen(
                                 }
                             },
                             enabled = !isSavingMemory && memoryNote.trim().isNotEmpty(),
-                            colors = ButtonDefaults.buttonColors(containerColor = MintColor),
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.mint),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
                                 text = if (isMemorySaved) "✓ Saved!" else if (isSavingMemory) "Saving..." else "Save memory",
-                                color = InkColor,
+                                color = if (colors.isDark) colors.ink else Color.White,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -447,9 +452,9 @@ fun MainScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                             shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
+                            modifier = Modifier.border(1.dp, colors.cardBorder, RoundedCornerShape(16.dp))
                         ) {
-                            Text(text = "Cancel", color = Color.LightGray)
+                            Text(text = "Cancel", color = colors.textSecondary)
                         }
                     }
                 }
@@ -462,8 +467,8 @@ fun MainScreen(
         Dialog(onDismissRequest = { showApiSettings = false }) {
             Card(
                 shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF090D16)),
+                border = BorderStroke(1.dp, colors.cardBorder),
+                colors = CardDefaults.cardColors(containerColor = colors.panel),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
@@ -475,7 +480,7 @@ fun MainScreen(
 
                     Text(
                         text = "Server Configuration",
-                        color = Color.White,
+                        color = colors.textPrimary,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
@@ -484,7 +489,7 @@ fun MainScreen(
                     )
                     Text(
                         text = "Configure caregiver details used for SOS alerts.",
-                        color = Color.Gray,
+                        color = colors.textSecondary,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -495,13 +500,13 @@ fun MainScreen(
                         OutlinedTextField(
                             value = apiInputUrl,
                             onValueChange = { apiInputUrl = it },
-                            textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                            textStyle = TextStyle(color = colors.textPrimary, fontSize = 13.sp),
                             label = { Text("API Base URL (Developer Mode)") },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MintColor,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                focusedLabelColor = MintColor,
-                                unfocusedLabelColor = Color.Gray
+                                focusedBorderColor = colors.mint,
+                                unfocusedBorderColor = colors.cardBorder,
+                                focusedLabelColor = colors.mint,
+                                unfocusedLabelColor = colors.textSecondary
                             ),
                             singleLine = true,
                             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
@@ -515,13 +520,13 @@ fun MainScreen(
                     OutlinedTextField(
                         value = caregiverInputName,
                         onValueChange = { caregiverInputName = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                        textStyle = TextStyle(color = colors.textPrimary, fontSize = 13.sp),
                         label = { Text("Default Caregiver Name") },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MintColor,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                            focusedLabelColor = MintColor,
-                            unfocusedLabelColor = Color.Gray
+                            focusedBorderColor = colors.mint,
+                            unfocusedBorderColor = colors.cardBorder,
+                            focusedLabelColor = colors.mint,
+                            unfocusedLabelColor = colors.textSecondary
                         ),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -533,13 +538,13 @@ fun MainScreen(
                     OutlinedTextField(
                         value = caregiverInputPhone,
                         onValueChange = { caregiverInputPhone = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                        textStyle = TextStyle(color = colors.textPrimary, fontSize = 13.sp),
                         label = { Text("Default Caregiver Phone") },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MintColor,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                            focusedLabelColor = MintColor,
-                            unfocusedLabelColor = Color.Gray
+                            focusedBorderColor = colors.mint,
+                            unfocusedBorderColor = colors.cardBorder,
+                            focusedLabelColor = colors.mint,
+                            unfocusedLabelColor = colors.textSecondary
                         ),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -555,13 +560,13 @@ fun MainScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Dementia Reminders",
-                                color = Color.White,
+                                color = colors.textPrimary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "Enable periodic voice and push notifications.",
-                                color = Color.Gray,
+                                color = colors.textSecondary,
                                 fontSize = 11.sp
                             )
                         }
@@ -569,10 +574,42 @@ fun MainScreen(
                             checked = remindersInputEnabled,
                             onCheckedChange = { remindersInputEnabled = it },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = MintColor,
-                                checkedTrackColor = MintColor.copy(alpha = 0.4f),
-                                uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
+                                checkedThumbColor = colors.mint,
+                                checkedTrackColor = colors.mint.copy(alpha = 0.4f),
+                                uncheckedThumbColor = colors.textSecondary,
+                                uncheckedTrackColor = colors.textSecondary.copy(alpha = 0.3f)
+                            )
+                        )
+                    }
+
+                    // Dark Theme Mode Row
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Dark Theme Mode",
+                                color = colors.textPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Use a battery-saving dark interface.",
+                                color = colors.textSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = darkModeInputEnabled,
+                            onCheckedChange = { darkModeInputEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colors.mint,
+                                checkedTrackColor = colors.mint.copy(alpha = 0.4f),
+                                uncheckedThumbColor = colors.textSecondary,
+                                uncheckedTrackColor = colors.textSecondary.copy(alpha = 0.3f)
                             )
                         )
                     }
@@ -596,13 +633,13 @@ fun MainScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Battery Optimization",
-                                color = Color.White,
+                                color = colors.textPrimary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = if (isIgnoring) "Status: Unrestricted (Good)" else "Status: Optimized (May delay reminders)",
-                                color = if (isIgnoring) MintColor else Color.Gray,
+                                color = if (isIgnoring) colors.mint else colors.textSecondary,
                                 fontSize = 11.sp
                             )
                         }
@@ -619,15 +656,15 @@ fun MainScreen(
                                         Log.e("Settings", "Failed battery request", e)
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = MintColor),
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.mint),
                                 shape = RoundedCornerShape(12.dp),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                 modifier = Modifier.height(32.dp)
                             ) {
-                                Text("Disable", color = InkColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Disable", color = if (colors.isDark) colors.ink else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         } else {
-                            Text("✓", color = MintColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("✓", color = colors.mint, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
                     }
 
@@ -643,6 +680,8 @@ fun MainScreen(
                                 prefManager.caregiverName = caregiverInputName.trim()
                                 prefManager.caregiverPhone = caregiverInputPhone.trim()
                                 prefManager.remindersEnabled = remindersInputEnabled
+                                prefManager.darkMode = darkModeInputEnabled
+                                onThemeChanged(darkModeInputEnabled)
                                 if (remindersInputEnabled) {
                                     ReminderScheduler.schedule(context)
                                 } else {
@@ -650,20 +689,20 @@ fun MainScreen(
                                 }
                                 showApiSettings = false
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = MintColor),
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.mint),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Save", color = InkColor, fontWeight = FontWeight.Bold)
+                            Text(text = "Save", color = if (colors.isDark) colors.ink else Color.White, fontWeight = FontWeight.Bold)
                         }
 
                         Button(
                             onClick = { showApiSettings = false },
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                             shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
+                            modifier = Modifier.border(1.dp, colors.cardBorder, RoundedCornerShape(16.dp))
                         ) {
-                            Text(text = "Cancel", color = Color.LightGray)
+                            Text(text = "Cancel", color = colors.textSecondary)
                         }
                     }
                 }
@@ -692,6 +731,7 @@ fun DashboardCamera(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
+    val colors = LocalAppColors.current
 
     // Wrap state arguments in rememberUpdatedState to avoid stale captures on background thread
     val latestRecognition by rememberUpdatedState(recognition)
@@ -715,8 +755,8 @@ fun DashboardCamera(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(32.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(32.dp))
-            .background(PanelColor)
+            .border(1.dp, colors.cardBorder, RoundedCornerShape(32.dp))
+            .background(colors.panel)
     ) {
         var isCameraActive by remember(prefManager.cameraEnabled, isActive) {
             mutableStateOf(prefManager.cameraEnabled && isActive)
@@ -834,9 +874,11 @@ fun DashboardCamera(
                                                                             try {
                                                                                 api.logMemory(
                                                                                     MemoryLogRequest(
+                                                                                        person_id = match.person_id,
                                                                                         person_name = summary.name,
                                                                                         relationship = summary.relationship,
                                                                                         summary = summary.summary,
+                                                                                        note = summary.summary,
                                                                                         caregiver_phone = caregiverPhone,
                                                                                         timestamp = java.time.Instant.now().toString()
                                                                                     )
@@ -962,7 +1004,7 @@ fun DashboardCamera(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF0F172A))
+                    .background(colors.panel)
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -974,8 +1016,8 @@ fun DashboardCamera(
                         modifier = Modifier
                             .size(80.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.03f))
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                            .background(colors.textPrimary.copy(alpha = 0.03f))
+                            .border(1.dp, colors.cardBorder, CircleShape)
                     ) {
                         Text(
                             text = "📷",
@@ -985,14 +1027,14 @@ fun DashboardCamera(
 
                     Text(
                         text = "Camera is stopped",
-                        color = Color.White,
+                        color = colors.textPrimary,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
                         text = "Turn on the camera to start recognizing faces.",
-                        color = Color.Gray,
+                        color = colors.textSecondary,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center
                     )
@@ -1003,8 +1045,8 @@ fun DashboardCamera(
                             prefManager.cameraEnabled = true
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MintColor,
-                            contentColor = InkColor
+                            containerColor = colors.mint,
+                            contentColor = if (colors.isDark) colors.ink else Color.White
                         ),
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.padding(top = 8.dp)
@@ -1064,7 +1106,7 @@ fun DashboardCamera(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(if (isCameraActive) MintColor else Color.Gray)
+                        .background(if (isCameraActive) colors.mint else Color.Gray)
                 )
                 Text(
                     text = statusText,
@@ -1087,9 +1129,9 @@ fun DashboardCamera(
             recognition?.let { rec ->
                 Card(
                     shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+                    border = BorderStroke(1.dp, colors.cardBorder),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xEC090D16)
+                        containerColor = colors.panel.copy(alpha = 0.92f)
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -1105,12 +1147,12 @@ fun DashboardCamera(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(MintColor.copy(alpha = 0.15f))
-                                    .border(1.dp, MintColor.copy(alpha = 0.20f), RoundedCornerShape(16.dp))
+                                    .background(colors.mint.copy(alpha = 0.15f))
+                                    .border(1.dp, colors.mint.copy(alpha = 0.20f), RoundedCornerShape(16.dp))
                             ) {
                                 Text(
                                     text = rec.name.take(1).uppercase(Locale.ROOT),
-                                    color = MintColor,
+                                    color = colors.mint,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1121,14 +1163,14 @@ fun DashboardCamera(
                             ) {
                                 Text(
                                     text = rec.relationship.uppercase(Locale.ROOT),
-                                    color = MintColor,
+                                    color = colors.mint,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.5.sp
                                 )
                                 Text(
                                     text = rec.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() },
-                                    color = Color.White,
+                                    color = colors.textPrimary,
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1137,13 +1179,13 @@ fun DashboardCamera(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(MintColor.copy(alpha = 0.10f))
-                                    .border(1.dp, MintColor.copy(alpha = 0.20f), RoundedCornerShape(12.dp))
+                                    .background(colors.mint.copy(alpha = 0.10f))
+                                    .border(1.dp, colors.mint.copy(alpha = 0.20f), RoundedCornerShape(12.dp))
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Text(
                                     text = "Verified Match",
-                                    color = MintColor,
+                                    color = colors.mint,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -1151,12 +1193,12 @@ fun DashboardCamera(
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        HorizontalDivider(color = colors.cardBorder)
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Text(
                             text = rec.summary,
-                            color = Color(0xFFD1D5DB),
+                            color = colors.textSecondary,
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
                             modifier = Modifier.padding(bottom = 12.dp)
@@ -1165,16 +1207,16 @@ fun DashboardCamera(
                         Button(
                             onClick = onShowMemoryModal,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White.copy(alpha = 0.05f)
+                                containerColor = colors.inputBackground
                             ),
                             shape = RoundedCornerShape(20.dp),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+                            border = BorderStroke(1.dp, colors.cardBorder),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                             modifier = Modifier.align(Alignment.Start)
                         ) {
                             Text(
                                 text = "＋ Add a memory",
-                                color = Color.LightGray,
+                                color = colors.textSecondary,
                                 fontSize = 12.sp
                             )
                         }

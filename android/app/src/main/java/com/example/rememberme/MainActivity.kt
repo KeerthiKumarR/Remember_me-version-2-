@@ -24,6 +24,10 @@ import android.provider.Settings
 import android.app.AlertDialog
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import com.example.rememberme.data.PreferencesManager
 
 class MainActivity : ComponentActivity() {
 
@@ -52,12 +56,22 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            RememberMeTheme {
+            val context = LocalContext.current
+            val prefManager = remember { PreferencesManager(context) }
+            var isDarkMode by remember { mutableStateOf(prefManager.darkMode) }
+
+            RememberMeTheme(darkTheme = isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = if (isDarkMode) Color(0xFF080B12) else Color(0xFFF3F4F6)
                 ) {
-                    MainNavigation()
+                    MainNavigation(
+                        isDarkMode = isDarkMode,
+                        onThemeChanged = { newMode ->
+                            prefManager.darkMode = newMode
+                            isDarkMode = newMode
+                        }
+                    )
                 }
             }
         }

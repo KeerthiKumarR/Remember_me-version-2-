@@ -86,6 +86,7 @@ android/captures/
 *.iml
 .idea/
 *.hprof
+google-services.json
 
 # =============================================================
 # OS FILES
