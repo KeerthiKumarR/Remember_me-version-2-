@@ -412,7 +412,7 @@ fun MainScreen(
                                     coroutineScope.launch {
                                         try {
                                             val api = NetworkClient.createService(prefManager.apiUrl)
-                                            api.logMemory(MemoryLogRequest(rec.person_id, memoryNote.trim()))
+                                            api.logManualMemory(ManualMemoryLogRequest(rec.person_id, memoryNote.trim()))
                                             isMemorySaved = true
                                             delay(1200)
                                             showMemoryModal = false
@@ -827,6 +827,26 @@ fun DashboardCamera(
                                                                     val summary = api.summarizePerson(SummarizeRequest(match.person_id))
                                                                     latestOnRecognitionChange(summary)
                                                                     cachedPersonId = match.person_id
+                                                                    
+                                                                    val caregiverPhone = match.caregiver_phone ?: activeCaregiverPhone
+                                                                    if (caregiverPhone.isNotEmpty()) {
+                                                                        coroutineScope.launch {
+                                                                            try {
+                                                                                api.logMemory(
+                                                                                    MemoryLogRequest(
+                                                                                        person_name = summary.name,
+                                                                                        relationship = summary.relationship,
+                                                                                        summary = summary.summary,
+                                                                                        caregiver_phone = caregiverPhone,
+                                                                                        timestamp = java.time.Instant.now().toString()
+                                                                                    )
+                                                                                )
+                                                                                Log.d("IdentifyAPI", "Successfully auto-logged memory event for ${summary.name}")
+                                                                            } catch (e: Exception) {
+                                                                                Log.e("IdentifyAPI", "Failed to auto-log memory event", e)
+                                                                            }
+                                                                        }
+                                                                    }
                                                                 } else {
                                                                     latestOnRecognitionChange(
                                                                         latestRecognition?.copy(
