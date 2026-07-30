@@ -21,7 +21,7 @@ class PreferencesManager(private val context: Context) {
         private val KEY_CAREGIVER_PHONE = stringPreferencesKey("caregiver_phone")
         private val KEY_API_URL = stringPreferencesKey("api_url")
         
-        private const val DEFAULT_API_URL = "https://miraiwininghacathonproject-production.up.railway.app"
+        private const val DEFAULT_API_URL = "https://remember-me-version-2.onrender.com"
     }
 
     val patientNameFlow: Flow<String> = context.dataStore.data.map { preferences ->

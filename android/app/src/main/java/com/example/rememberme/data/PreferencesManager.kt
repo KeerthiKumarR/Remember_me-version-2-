@@ -8,20 +8,14 @@ class PreferencesManager(context: Context) {
 
     companion object {
         private const val KEY_API_URL = "api_url"
-        private const val DEFAULT_API_URL = "https://miraiwininghacathonproject-production.up.railway.app"
+        private const val DEFAULT_API_URL = "https://remember-me-version-2.onrender.com"
         private const val KEY_CAREGIVER_NAME = "caregiver_name"
         private const val KEY_CAREGIVER_PHONE = "caregiver_phone"
     }
 
     var apiUrl: String
         get() {
-            val current = prefs.getString(KEY_API_URL, DEFAULT_API_URL) ?: DEFAULT_API_URL
-            return if (current.contains("10.201.") || current.contains("127.0.0.1") || current.contains("localhost")) {
-                prefs.edit().putString(KEY_API_URL, DEFAULT_API_URL).apply()
-                DEFAULT_API_URL
-            } else {
-                current
-            }
+            return prefs.getString(KEY_API_URL, DEFAULT_API_URL) ?: DEFAULT_API_URL
         }
         set(value) {
             prefs.edit().putString(KEY_API_URL, value).apply()

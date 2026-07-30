@@ -36,7 +36,7 @@ fun SettingsScreen(
     val currentPatientName by preferencesManager.patientNameFlow.collectAsState(initial = "Patient")
     val currentPatientPhone by preferencesManager.patientPhoneFlow.collectAsState(initial = "1234567890")
     val currentCaregiverPhone by preferencesManager.caregiverPhoneFlow.collectAsState(initial = "9876543210")
-    val currentApiUrl by preferencesManager.apiUrlFlow.collectAsState(initial = "https://miraiwininghacathonproject-production.up.railway.app")
+    val currentApiUrl by preferencesManager.apiUrlFlow.collectAsState(initial = "https://remember-me-version-2.onrender.com")
 
     var patientName by remember { mutableStateOf("") }
     var patientPhone by remember { mutableStateOf("") }
