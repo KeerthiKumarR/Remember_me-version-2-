@@ -31,3 +31,4 @@ plugins {
 
 rootProject.name = "RememberMe"
 include(":app")
+include(":wear")

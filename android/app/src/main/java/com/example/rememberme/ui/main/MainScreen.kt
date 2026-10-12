@@ -887,6 +887,19 @@ fun DashboardCamera(
                                                                 latestOnStatusTextChange("Familiar face recognized")
                                                                 latestOnActiveCaregiverNameChange(match.name)
                                                                 latestOnActiveCaregiverPhoneChange(match.caregiver_phone ?: "")
+
+                                                                // Sync last-seen person to paired Wear OS watch
+                                                                try {
+                                                                    val dataClient = com.google.android.gms.wearable.Wearable.getDataClient(context)
+                                                                    val putDataReq = com.google.android.gms.wearable.PutDataMapRequest.create("/last_seen").apply {
+                                                                        dataMap.putString("name", match.name)
+                                                                        dataMap.putString("relationship", match.relationship ?: "")
+                                                                        dataMap.putLong("timestamp", System.currentTimeMillis())
+                                                                    }.asPutDataRequest().setUrgent()
+                                                                    dataClient.putDataItem(putDataReq)
+                                                                } catch (e: Exception) {
+                                                                    Log.d("WearSync", "Wearable sync skipped: ${e.message}")
+                                                                }
                                                                 if (cachedPersonId != match.person_id) {
                                                                     val summary = api.summarizePerson(SummarizeRequest(match.person_id))
                                                                     latestOnRecognitionChange(summary)

@@ -91,8 +91,9 @@ dependencies {
   // ML Kit
   implementation(libs.mlkit.face.detection)
 
-  // Location Services
+  // Location & Wearable Services
   implementation(libs.play.services.location)
+  implementation(libs.play.services.wearable)
 
   // Networking
   implementation(libs.retrofit)
