@@ -20,10 +20,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.*
+import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -46,15 +46,15 @@ class MainActivity : ComponentActivity() {
 
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             try {
-                val nodes = nodeClient.connectedNodes.await()
-                if (nodes.isEmpty()) {
+                val nodes = Tasks.await(nodeClient.connectedNodes)
+                if (nodes.isNullOrEmpty()) {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(context, "No phone connected", Toast.LENGTH_SHORT).show()
                     }
                     return@launch
                 }
                 for (node in nodes) {
-                    messageClient.sendMessage(node.id, "/sos", ByteArray(0)).await()
+                    Tasks.await(messageClient.sendMessage(node.id, "/sos", ByteArray(0)))
                 }
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "🚨 SOS Sent to Phone!", Toast.LENGTH_SHORT).show()
@@ -81,7 +81,7 @@ fun WearApp(onSendSos: () -> Unit) {
                 .background(Color(0xFF0A0F1D))
                 .verticalScroll(scrollState)
                 .padding(horizontal = 14.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterVertically
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = "RememberMe",

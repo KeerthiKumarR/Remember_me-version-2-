@@ -1,6 +1,5 @@
 package com.example.rememberme.wear
 
-import android.content.Intent
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders
 import androidx.wear.protolayout.DimensionBuilders
@@ -8,10 +7,8 @@ import androidx.wear.protolayout.LayoutElementBuilders
 import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
-import androidx.wear.protolayout.material.Button
-import androidx.wear.protolayout.material.ButtonColors
-import androidx.wear.protolayout.material.ButtonDefaults
 import androidx.wear.protolayout.material.Text
+import androidx.wear.protolayout.material.Typography
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
@@ -30,25 +27,35 @@ class SosTileService : TileService() {
             )
             .build()
 
-        val clickModifier = ModifiersBuilders.Modifiers.Builder()
-            .setClickable(
-                ModifiersBuilders.Clickable.Builder()
-                    .setId("sos_click")
-                    .setOnClick(launchIntent)
-                    .build()
-            )
+        val clickable = ModifiersBuilders.Clickable.Builder()
+            .setId("sos_click")
+            .setOnClick(launchIntent)
             .build()
 
-        val sosButton = Button.Builder(this, clickModifier)
-            .setSizeContent(DimensionBuilders.dp(120f))
-            .setButtonColors(
-                ButtonColors(
-                    ColorBuilders.argb(0xFFEF4444.toInt()),
-                    ColorBuilders.argb(0xFFFFFFFF.toInt())
-                )
+        val label = Text.Builder(this, "EMERGENCY\nSOS")
+            .setTypography(Typography.TYPOGRAPHY_TITLE2)
+            .setColor(ColorBuilders.argb(0xFFFFFFFF.toInt()))
+            .build()
+
+        val sosBox = LayoutElementBuilders.Box.Builder()
+            .setWidth(DimensionBuilders.dp(120f))
+            .setHeight(DimensionBuilders.dp(120f))
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setClickable(clickable)
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(ColorBuilders.argb(0xFFEF4444.toInt()))
+                            .setCorner(
+                                ModifiersBuilders.Corner.Builder()
+                                    .setRadius(DimensionBuilders.dp(60f))
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
             )
-            .setContentDescription("Emergency SOS Button")
-            .setTextContent("EMERGENCY\nSOS")
+            .addContent(label)
             .build()
 
         val layout = LayoutElementBuilders.Layout.Builder()
@@ -56,7 +63,7 @@ class SosTileService : TileService() {
                 LayoutElementBuilders.Box.Builder()
                     .setWidth(DimensionBuilders.expand())
                     .setHeight(DimensionBuilders.expand())
-                    .addContent(sosButton)
+                    .addContent(sosBox)
                     .build()
             )
             .build()
@@ -71,7 +78,7 @@ class SosTileService : TileService() {
 
         val tile = TileBuilders.Tile.Builder()
             .setResourcesVersion("1")
-            .setTimeline(timeline)
+            .setTileTimeline(timeline)
             .build()
 
         return Futures.immediateFuture(tile)

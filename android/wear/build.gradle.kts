@@ -62,4 +62,7 @@ dependencies {
 
     // Coroutines & Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.1")
+    implementation("com.google.guava:guava:31.1-android")
+    implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
 }
