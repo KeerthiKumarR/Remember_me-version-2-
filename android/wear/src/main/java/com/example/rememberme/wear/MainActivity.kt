@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.*
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.Wearable
@@ -70,76 +72,87 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WearApp(onSendSos: () -> Unit) {
-    val scrollState = rememberScrollState()
+    val listState = rememberScalingLazyListState()
 
     Scaffold(
-        timeText = { TimeText() }
+        timeText = { TimeText() },
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
     ) {
-        Column(
+        ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0A0F1D))
-                .verticalScroll(scrollState)
-                .padding(horizontal = 14.dp, vertical = 24.dp),
+                .background(Color(0xFF0A0F1D)),
+            state = listState,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "RememberMe",
-                color = Color(0xFF6EE7B7),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Large SOS emergency button
-            Button(
-                onClick = onSendSos,
-                modifier = Modifier
-                    .size(80.dp),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = Color(0xFFEF4444),
-                    contentColor = Color.White
-                )
-            ) {
+            item {
                 Text(
-                    text = "SOS",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black
+                    text = "RememberMe",
+                    color = Color(0xFF6EE7B7),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            item {
+                Spacer(modifier = Modifier.height(6.dp))
+            }
 
-            // Last Seen status card
-            Card(
-                onClick = { /* View details */ },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                backgroundPainter = CardDefaults.cardBackgroundPainter(
-                    startBackgroundColor = Color(0xFF1E293B),
-                    endBackgroundColor = Color(0xFF0F172A)
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            // Large SOS emergency button
+            item {
+                Button(
+                    onClick = onSendSos,
+                    modifier = Modifier.size(76.dp),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = Color(0xFFEF4444),
+                        contentColor = Color.White
+                    )
                 ) {
                     Text(
-                        text = "LAST SEEN",
-                        color = Color.Gray,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
+                        text = "SOS",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Caregiver Active",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Last Seen status card
+            item {
+                Card(
+                    onClick = { /* View details */ },
+                    modifier = Modifier.fillMaxWidth(0.9f),
+                    shape = RoundedCornerShape(16.dp),
+                    backgroundPainter = CardDefaults.cardBackgroundPainter(
+                        startBackgroundColor = Color(0xFF1E293B),
+                        endBackgroundColor = Color(0xFF0F172A)
                     )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "LAST SEEN",
+                            color = Color.Gray,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Caregiver Active",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
