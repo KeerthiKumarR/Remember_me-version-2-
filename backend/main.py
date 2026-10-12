@@ -333,23 +333,119 @@ async def summarize(payload: SummarizeRequest, request: Request) -> dict[str, An
         raise HTTPException(status_code=502, detail="Could not generate summary.") from exc
     return {"person_id": payload.person_id, "name": person["name"], "relationship": person["relationship"], "summary": summary}
 
+def dispatch_twilio_sms(to_phone: str, message: str) -> dict[str, Any]:
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    from_phone = os.getenv("TWILIO_PHONE_NUMBER")
+    if not (account_sid and auth_token and from_phone):
+        return {"attempted": False, "reason": "Twilio credentials not configured in environment"}
+
+    clean_to = to_phone.strip()
+    if not clean_to.startswith("+"):
+        clean_to = f"+{clean_to}"
+
+    import urllib.parse
+    import urllib.request
+    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+    post_data = urllib.parse.urlencode({
+        "To": clean_to,
+        "From": from_phone,
+        "Body": message
+    }).encode("utf-8")
+
+    req = urllib.request.Request(url, data=post_data, method="POST")
+    creds = base64.b64encode(f"{account_sid}:{auth_token}".encode("utf-8")).decode("utf-8")
+    req.add_header("Authorization", f"Basic {creds}")
+
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return {"attempted": True, "success": resp.status in (200, 201)}
+    except Exception as exc:
+        return {"attempted": True, "success": False, "error": str(exc)}
+
+
+def dispatch_fcm_notification(caregiver_phone: str, title: str, body: str, data: dict[str, Any]) -> dict[str, Any]:
+    server_key = os.getenv("FIREBASE_SERVER_KEY")
+    if not server_key:
+        return {"attempted": False, "reason": "FCM server key not configured in environment"}
+
+    clean_digits = "".join(filter(str.isdigit, caregiver_phone))
+    if not clean_digits:
+        return {"attempted": False, "reason": "Invalid caregiver phone number"}
+
+    import json
+    import urllib.request
+    url = "https://fcm.googleapis.com/fcm/send"
+    payload = {
+        "to": f"/topics/caregiver_{clean_digits}",
+        "priority": "high",
+        "notification": {
+            "title": title,
+            "body": body,
+            "sound": "default"
+        },
+        "data": data
+    }
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+    req.add_header("Authorization", f"key={server_key}")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return {"attempted": True, "success": resp.status == 200}
+    except Exception as exc:
+        return {"attempted": True, "success": False, "error": str(exc)}
+
+
 @app.post("/sos", status_code=status.HTTP_201_CREATED)
 async def send_sos(payload: SosRequest, request: Request) -> dict[str, Any]:
+    location_url = payload.location_link or (
+        f"https://maps.google.com/?q={payload.latitude},{payload.longitude}"
+        if payload.latitude and payload.longitude else ""
+    )
+    sms_message = (
+        f"🚨 EMERGENCY SOS from {payload.person_name}! "
+        f"Immediate assistance requested. "
+        + (f"Location: {location_url}" if location_url else "")
+    )
+    
+    sms_result = dispatch_twilio_sms(payload.caregiver_phone, sms_message)
+    fcm_result = dispatch_fcm_notification(
+        caregiver_phone=payload.caregiver_phone,
+        title=f"🚨 SOS Alert: {payload.person_name}",
+        body="Emergency alert triggered with GPS location.",
+        data={
+            "person_name": payload.person_name,
+            "caregiver_phone": payload.caregiver_phone,
+            "latitude": str(payload.latitude or ""),
+            "longitude": str(payload.longitude or ""),
+            "location_link": location_url,
+            "timestamp": payload.timestamp or utc_now().isoformat()
+        }
+    )
+
     alert = {
         "person_name": payload.person_name,
         "caregiver_phone": payload.caregiver_phone,
         "latitude": payload.latitude,
         "longitude": payload.longitude,
-        "location_link": payload.location_link,
+        "location_link": location_url,
         "timestamp": payload.timestamp or utc_now().isoformat(),
         "resolved": False,
+        "sms_dispatch": sms_result,
+        "fcm_dispatch": fcm_result,
         "created_at": utc_now()
     }
     try:
         await request.app.state.db.sos_alerts.insert_one(alert)
     except PyMongoError as exc:
         raise HTTPException(status_code=503, detail="Could not save SOS alert.") from exc
-    return {"status": "success", "message": f"SOS alert processed for {payload.person_name}"}
+    return {
+        "status": "success",
+        "message": f"SOS alert processed for {payload.person_name}",
+        "sms": sms_result,
+        "fcm": fcm_result
+    }
 
 
 @app.get("/sos/active")
