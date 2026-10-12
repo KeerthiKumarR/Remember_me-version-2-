@@ -38,6 +38,8 @@ export default function Home() {
   const [recognition, setRecognition] = useState<Recognition | null>(null);
   const [status, setStatus] = useState("Looking for a familiar face...");
   const [challenge, setChallenge] = useState<Challenge>(pickChallenge);
+  const challengeRef = useRef<Challenge>(challenge);
+  challengeRef.current = challenge;
   const [livenessStatus, setLivenessStatus] = useState<LivenessStatus>("waiting");
   const [faceMeshReady, setFaceMeshReady] = useState(false);
 
@@ -73,7 +75,7 @@ export default function Home() {
         const lm = results.multiFaceLandmarks[0];
         if (liveVerified.current) return;
 
-        const currentChallenge = challenge;
+        const currentChallenge = challengeRef.current;
 
         if (currentChallenge === "TURN LEFT" || currentChallenge === "TURN RIGHT") {
           const noseX = lm[1].x;
@@ -171,7 +173,7 @@ export default function Home() {
     setStatus("Checking this face...");
     try {
       const identified = await identifyFace(image);
-      if (identified.match && identified.confidence > 0.7) {
+      if (identified.match) {
         let summary = summaryCache.current?.summary;
         if (summaryCache.current?.personId !== identified.match.person_id) {
           const response = await summarizePerson(identified.match.person_id);

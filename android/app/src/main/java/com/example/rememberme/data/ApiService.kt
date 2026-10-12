@@ -36,13 +36,26 @@ object NetworkClient {
         .addInterceptor(logging)
         .build()
 
+    @Volatile
+    private var cachedBaseUrl: String? = null
+    @Volatile
+    private var cachedService: ApiService? = null
+
+    @Synchronized
     fun createService(baseUrl: String): ApiService {
         val formattedUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
-        return Retrofit.Builder()
+        val existing = cachedService
+        if (existing != null && cachedBaseUrl == formattedUrl) {
+            return existing
+        }
+        val service = Retrofit.Builder()
             .baseUrl(formattedUrl)
             .client(httpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ApiService::class.java)
+        cachedBaseUrl = formattedUrl
+        cachedService = service
+        return service
     }
 }

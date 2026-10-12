@@ -38,7 +38,7 @@ class PreferencesManager(context: Context) {
         set(value) { prefs.edit().putBoolean("reminders_enabled", value).apply() }
 
     var reminderIntervalMinutes: Int
-        get() = prefs.getInt("reminder_interval_minutes", 2)
+        get() = prefs.getInt("reminder_interval_minutes", 60)
         set(value) { prefs.edit().putInt("reminder_interval_minutes", value).apply() }
 
     var cameraEnabled: Boolean

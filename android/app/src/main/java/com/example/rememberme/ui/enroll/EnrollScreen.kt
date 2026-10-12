@@ -43,6 +43,7 @@ import com.example.rememberme.data.EnrollRequest
 import com.example.rememberme.data.NetworkClient
 import com.example.rememberme.data.PreferencesManager
 import com.example.rememberme.theme.LocalAppColors
+import com.example.rememberme.util.ImageUtils
 import androidx.compose.foundation.shape.CircleShape
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
@@ -227,7 +228,7 @@ fun EnrollScreen(
                                             override fun onCaptureSuccess(imageProxy: ImageProxy) {
                                                 try {
                                                     val rawBitmap = imageProxy.toBitmap()
-                                                    val orientedBitmap = resizeBitmap(rawBitmap, 640)
+                                                    val orientedBitmap = ImageUtils.resizeBitmap(rawBitmap, 640)
 
                                                     capturedBitmap = orientedBitmap
                                                     
@@ -453,22 +454,4 @@ fun EnrollScreen(
             }
         }
     }
-}
-
-private fun resizeBitmap(bitmap: Bitmap, maxDimension: Int): Bitmap {
-    val width = bitmap.width
-    val height = bitmap.height
-    if (width <= maxDimension && height <= maxDimension) return bitmap
-    
-    val aspectRatio = width.toFloat() / height.toFloat()
-    val newWidth: Int
-    val newHeight: Int
-    if (width > height) {
-        newWidth = maxDimension
-        newHeight = (maxDimension / aspectRatio).toInt()
-    } else {
-        newHeight = maxDimension
-        newWidth = (maxDimension * aspectRatio).toInt()
-    }
-    return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
 }

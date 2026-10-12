@@ -56,6 +56,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import android.os.Build
 import com.example.rememberme.notification.ReminderScheduler
+import com.example.rememberme.util.ImageUtils
 import com.example.rememberme.data.*
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
@@ -743,6 +744,8 @@ fun DashboardCamera(
     var lastIdentifyTime by remember { mutableLongStateOf(0L) }
     var isIdentifyInFlight by remember { mutableStateOf(false) }
     var cachedPersonId by remember { mutableStateOf("") }
+    var currentChallenge by remember { mutableStateOf(Challenge.random()) }
+    var isLivenessPassed by remember { mutableStateOf(false) }
 
     LaunchedEffect(recognition) {
         if (recognition == null) {
@@ -819,10 +822,31 @@ fun DashboardCamera(
                                             val smile = face.smilingProbability ?: 0f
                                             val yaw = face.headEulerAngleY
 
+                                            // Liveness check: require dynamic gesture matching random challenge
+                                            val satisfied = when (currentChallenge) {
+                                                Challenge.SMILE -> smile > 0.40f
+                                                Challenge.TURN_LEFT -> yaw > 12f
+                                                Challenge.TURN_RIGHT -> yaw < -12f
+                                            }
+
+                                            if (!isLivenessPassed && !satisfied) {
+                                                val hint = when (currentChallenge) {
+                                                    Challenge.SMILE -> "Live check: Please Smile 😊"
+                                                    Challenge.TURN_LEFT -> "Live check: Turn head Left ⬅️"
+                                                    Challenge.TURN_RIGHT -> "Live check: Turn head Right ➡️"
+                                                }
+                                                latestOnStatusTextChange(hint)
+                                                return@addOnSuccessListener
+                                            }
+
+                                            isLivenessPassed = true
+
                                             val now = System.currentTimeMillis()
                                             if (now - lastIdentifyTime > 3000 && !isIdentifyInFlight) {
                                                 lastIdentifyTime = now
                                                 isIdentifyInFlight = true
+                                                currentChallenge = Challenge.random()
+                                                isLivenessPassed = false
 
                                                 try {
                                                     @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
@@ -839,7 +863,7 @@ fun DashboardCamera(
                                                         rawBitmap
                                                     }
 
-                                                    val bitmap = resizeBitmap(rotatedBitmap, 640)
+                                                    val bitmap = ImageUtils.resizeBitmap(rotatedBitmap, 640)
                                                     val stream = ByteArrayOutputStream()
                                                     bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
 
@@ -1225,24 +1249,6 @@ fun DashboardCamera(
             }
         }
     }
-}
-
-private fun resizeBitmap(bitmap: Bitmap, maxDimension: Int): Bitmap {
-    val width = bitmap.width
-    val height = bitmap.height
-    if (width <= maxDimension && height <= maxDimension) return bitmap
-    
-    val aspectRatio = width.toFloat() / height.toFloat()
-    val newWidth: Int
-    val newHeight: Int
-    if (width > height) {
-        newWidth = maxDimension
-        newHeight = (maxDimension / aspectRatio).toInt()
-    } else {
-        newHeight = maxDimension
-        newWidth = (maxDimension * aspectRatio).toInt()
-    }
-    return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
 }
 
 @android.annotation.SuppressLint("MissingPermission")
