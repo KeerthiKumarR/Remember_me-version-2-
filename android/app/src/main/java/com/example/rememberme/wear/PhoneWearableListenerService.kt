@@ -38,7 +38,7 @@ class PhoneWearableListenerService : WearableListenerService() {
         buzzPhone(context)
 
         val prefManager = PreferencesManager(context)
-        val patientName = prefManager.patientName.ifBlank { "Patient" }
+        val patientName = if (prefManager.caregiverName.isNotBlank()) prefManager.caregiverName else "Patient"
         val caregiverPhone = prefManager.caregiverPhone
 
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -52,6 +52,7 @@ class PhoneWearableListenerService : WearableListenerService() {
                     val locationLink = if (lat != 0.0 && lng != 0.0) {
                         "https://maps.google.com/?q=$lat,$lng"
                     } else ""
+                    val nowIso = java.time.Instant.now().toString()
 
                     serviceScope.launch {
                         try {
@@ -62,7 +63,8 @@ class PhoneWearableListenerService : WearableListenerService() {
                                     caregiver_phone = caregiverPhone,
                                     latitude = lat,
                                     longitude = lng,
-                                    location_link = locationLink
+                                    location_link = locationLink,
+                                    timestamp = nowIso
                                 )
                             )
                             Log.d("PhoneWearable", "Watch SOS successfully dispatched to backend!")
@@ -82,7 +84,8 @@ class PhoneWearableListenerService : WearableListenerService() {
                                     caregiver_phone = caregiverPhone,
                                     latitude = 0.0,
                                     longitude = 0.0,
-                                    location_link = ""
+                                    location_link = "",
+                                    timestamp = java.time.Instant.now().toString()
                                 )
                             )
                         } catch (e: Exception) {

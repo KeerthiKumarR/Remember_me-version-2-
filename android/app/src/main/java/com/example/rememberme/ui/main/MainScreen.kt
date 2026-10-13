@@ -669,6 +669,49 @@ fun MainScreen(
                         }
                     }
 
+                    // Smartwatch Vibration & Haptics Test Card
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = colors.panel),
+                        border = BorderStroke(1.dp, colors.cardBorder),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "⌚ Smartwatch Vibration",
+                                        color = colors.textPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Pulse your Noise / Wear watch",
+                                        color = colors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                Button(
+                                    onClick = {
+                                        com.example.rememberme.notification.NotificationHelper.triggerWatchVibrationTest(context)
+                                        android.widget.Toast.makeText(context, "Vibration pulse sent to your smartwatch!", android.widget.Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.mint),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Text("Test Pulse", color = if (colors.isDark) colors.ink else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Row(
@@ -900,6 +943,14 @@ fun DashboardCamera(
                                                                 } catch (e: Exception) {
                                                                     Log.d("WearSync", "Wearable sync skipped: ${e.message}")
                                                                 }
+
+                                                                // Forward recognition alert to smartwatch as haptic vibration notification
+                                                                com.example.rememberme.notification.NotificationHelper.showRecognitionNotification(
+                                                                    context,
+                                                                    match.name,
+                                                                    match.relationship ?: "Familiar person"
+                                                                )
+
                                                                 if (cachedPersonId != match.person_id) {
                                                                     val summary = api.summarizePerson(SummarizeRequest(match.person_id))
                                                                     latestOnRecognitionChange(summary)
